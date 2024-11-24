@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inclination Angle Viewer</title>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+    }
+
+    .overlay {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 2rem;
+      color: white;
+      z-index: 2;
+    }
+
+    .crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 50px;
+      height: 50px;
+      pointer-events: none;
+    }
+
+    .crosshair::before,
+    .crosshair::after {
+      content: "";
+      position: absolute;
+      background-color: red;
+      z-index: 3;
+    }
+
+    .crosshair::before {
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      transform: translateY(-50%);
+    }
+
+    .crosshair::after {
+      left: 50%;
+      top: 0;
+      width: 2px;
+      height: 100%;
+      transform: translateX(-50%);
+    }
+  </style>
+</head>
+<body>
+  <video id="camera" autoplay muted></video>
+  <div class="overlay">
+    <h1 id="angle">0°</h1>
+    <p id="debug" style="font-size: 1rem;"></p>
+  </div>
+  <div class="crosshair"></div>
+  <script>
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+        document.getElementById('camera').srcObject = stream;
+      } catch (error) {
+        handleCameraError(error);
+      }
+    }
+
+    function handleCameraError(error) {
+      let message;
+      switch (error.name) {
+        case 'NotAllowedError':
+          message = "Camera access is denied. Please enable it in browser settings.";
+          break;
+        case 'NotFoundError':
+          message = "No camera found on this device.";
+          break;
+        default:
+          message = `Error accessing the camera: ${error.message}`;
+      }
+      alert(message);
+    }
+
+    function debugDeviceOrientationSupport() {
+      const debugElement = document.getElementById("debug");
+      if ("DeviceOrientationEvent" in window) {
+        debugElement.textContent = "DeviceOrientationEvent is supported.";
+      } else {
+        debugElement.textContent = "DeviceOrientationEvent is NOT supported on this device.";
+        return;
+      }
+
+      if (typeof DeviceOrientationEvent.requestPermission === "function") {
+        debugElement.textContent += " Permission request is required.";
+      } else {
+        debugElement.textContent += " Permission request is NOT required.";
+      }
+    }
+
+    async function requestDeviceOrientationPermission() {
+      try {
+        if (typeof DeviceOrientationEvent.requestPermission === "function") {
+          const response = await DeviceOrientationEvent.requestPermission();
+          if (response === "granted") {
+            window.addEventListener("deviceorientation", calculateAngle, true);
+            document.getElementById("debug").textContent += " Permission granted.";
+          } else {
+            document.getElementById("debug").textContent += " Permission denied.";
+          }
+        } else {
+          window.addEventListener("deviceorientation", calculateAngle, true);
+          document.getElementById("debug").textContent += " No explicit permission required.";
+        }
+      } catch (err) {
+        document.getElementById("debug").textContent += ` Error requesting permission: ${err.message}`;
+      }
+    }
+
+    function calculateAngle(event) {
+      const beta = event.beta;
+      if (beta !== null) {
+        const angle = Math.abs(beta).toFixed(1);
+        document.getElementById("angle").textContent = `${angle}°`;
+        document.getElementById("debug").textContent = `Raw Beta: ${beta}`;
+      } else {
+        document.getElementById("debug").textContent = "Beta is null. Check device orientation support.";
+      }
+    }
+
+    function startDebugging() {
+      debugDeviceOrientationSupport();
+      const enableButton = document.createElement("button");
+      enableButton.textContent = "Enable Device Orientation";
+      enableButton.style.position = "absolute";
+      enableButton.style.top = "50%";
+      enableButton.style.left = "50%";
+      enableButton.style.transform = "translate(-50%, -50%)";
+      enableButton.style.padding = "10px 20px";
+      enableButton.style.fontSize = "1rem";
+      enableButton.addEventListener("click", () => {
+        requestDeviceOrientationPermission();
+        enableButton.remove();
+      });
+      document.body.appendChild(enableButton);
+    }
+
+    startCamera();
+    startDebugging();
+  </script>
+</body>
+</html>
